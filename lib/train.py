@@ -6,59 +6,59 @@ metrics. At each relevant moment, calls the corresponding method of the History 
 passing them the history.
 """
 
-from experimenter import e
 
+class SupervisedTrainer:
 
-def train_on_batch(batch, zero_grad=True, step=True):
-    optimizer, model, loss_fn = e['optimizer', 'model', 'loss']
+    def __init__(self, kwargs):
+        self.model, self.optimizer, self.loss_fn = kwargs
 
-    x, y_true = batch
+    def train_on_batch(self, batch, zero_grad=True, step=True):
 
-    # zero the parameter gradients
-    if zero_grad:
-        optimizer.zero_grad()
+        x, y_true = batch
 
-    # get predictions and computes loss
-    y_pred = model(x)
-    # print(y_pred.cpu().detach().numpy().sum())
-    loss = loss_fn(y_pred, y_true)
+        # zero the parameter gradients
+        if zero_grad:
+            self.optimizer.zero_grad()
 
-    # compute gradients and
-    loss.backward()
+        # get predictions and computes loss
+        y_pred = self.model(x)
+        # print(y_pred.cpu().detach().numpy().sum())
+        loss = self.loss_fn(y_pred, y_true)
 
-    # perform optimization step
+        # compute gradients and
+        loss.backward()
 
-    if step:
-        optimizer.step()
+        # perform optimization step
 
-    return loss, y_pred
+        if step:
+            self.optimizer.step()
 
+        return loss, y_pred
 
-def train():
-    """
-    The optimization loop per se
-    :return:
-    """
-    epochs, batches_per_epoch, accumulate, data_loader, train_device, model = e[
-        'epochs', 'batches_per_epoch', 'batches_per_grad_update', 'data_loader', 'train_device', 'model']
+    def train(self, e):
+        """
+        The optimization loop per se
+        :return:
+        """
+        epochs, batches_per_epoch, accumulate, data_loader, train_device, model = e
 
-    model.to(train_device)
+        model.to(train_device)
 
-    for epoch in range(epochs):
-        e.emit('train_epoch_start', {'epoch': epoch})
+        for epoch in range(epochs):
+            # e.emit('train_epoch_start', {'epoch': epoch})
 
-        # Train some batches
-        x = iter(data_loader)
-        for i in range(batches_per_epoch):
-            e.emit('train_batch_start')
+            # Train some batches
+            x = iter(data_loader)
+            for i in range(batches_per_epoch):
+                # e.emit('train_batch_start')
 
-            batch = next(x)
-            loss, y_pred = train_on_batch(batch, zero_grad=(i % accumulate) == 0, step=((i + 1) % accumulate) == 0)
-            batch_loss = loss.item()  # / (accumulate if ((i + 1) % accumulate == 0) else (i + 1) % accumulate)
-            # print('batch loss', loss.item(), batch_loss)
+                batch = next(x)
+                loss, y_pred = self.train_on_batch(batch, zero_grad=(i % accumulate) == 0,
+                                                   step=((i + 1) % accumulate) == 0)
+                batch_loss = loss.item()
 
-            # save running stats
-            e.emit('train_batch_end',
-                   {'batch': batch, 'y_pred': y_pred, 'loss': batch_loss})
+                # save running stats
+                # e.emit('train_batch_end',
+                #        {'batch': batch, 'y_pred': y_pred, 'loss': batch_loss})
 
-        e.emit('train_epoch_end', {'n_used_batches': batches_per_epoch})
+            # e.emit('train_epoch_end', {'n_used_batches': batches_per_epoch})

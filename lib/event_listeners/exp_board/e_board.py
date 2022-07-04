@@ -106,28 +106,32 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 
-def serve_on_port(hostname, port, data):
-    handler = HandlerFactory(data)
-    server = ThreadingHTTPServer((hostname, port), handler)
-    print("Server started http://%s:%s" % (hostname, port))
-    # server.data = data
-    print('dir')
-    server.serve_forever()
-
-
 class EBoard:
 
     def __init__(self):
         hostName = "0.0.0.0"
         serverPort = 8080
+        self.server = None
         self.data = {}
-        self.thread = Thread(target=serve_on_port, args=[
+        self.thread = Thread(target=self.serve_on_port, args=[
             hostName,
             serverPort,
             self.data
-        ]).start()
+        ])
+        self.thread.start()
+
+    def serve_on_port(self, hostname, port, data):
+        handler = HandlerFactory(data)
+        self.server = ThreadingHTTPServer((hostname, port), handler)
+        print("Server started http://%s:%s" % (hostname, port))
+        self.server.serve_forever()
 
     def on_epoch_end(self, ev):
         def assign(k, v):
             self.data[k] = v
+
         assign('epoch', ev['epoch'])
+
+    def on_e_end(self, ev):
+        self.server.server_close()
+        self.thread.join()

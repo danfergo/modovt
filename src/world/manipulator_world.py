@@ -6,9 +6,6 @@ from yarok.components.ur5.ur5 import UR5
 
 from yarok.components.geltip.geltip import GelTip
 
-from yarok import wait
-from math import pi
-
 
 @component(
     components=[
@@ -26,7 +23,7 @@ from math import pi
             <visual>
                 <!-- important for the Geltips, to ensure the its camera frustum captures the close-up elastomer -->
                 <map znear="0.001" zfar="50"/>
-                <quality shadowsize="2048"/>
+                <!--<quality shadowsize="2048"/> -->
             </visual>
 
             <asset>
@@ -79,42 +76,7 @@ from math import pi
         </mujoco>
     """
 )
-class GraspRopeWorld:
+class ManipulatorWorld:
 
     def __init__(self):
         pass
-i = 0
-
-class GraspRoleBehaviour:
-
-    def __init__(self, arm: UR5, gripper: robotiq_2f85):
-        self.arm = arm
-        self.gripper = gripper
-
-    def wake_up(self):
-        q = [pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, pi / 2]
-        self.arm.move_q(q)
-        self.gripper.move(0)
-        wait(lambda: self.arm.is_at(q) and self.gripper.is_at(0))
-
-        q = [pi / 2, -pi / 2, pi / 2, 0, pi / 2, pi / 2]
-        self.arm.move_q(q)
-        wait(lambda: self.arm.is_at(q))
-
-        self.gripper.move(0.75)
-
-        def x():
-            global i
-            i += 1
-            return i > 100
-        wait(x)
-
-        q = [pi / 2, -pi / 2, pi / 2 - pi / 10, 0, pi / 2, pi / 2]
-        self.arm.move_q(q)
-        wait(lambda: self.arm.is_at(q))
-
-        q = [pi / 2, -pi / 2 + pi / 3, pi / 2 - pi / 10 + pi / 5, 0, pi / 2, pi / 2]
-        self.arm.move_q(q)
-        wait(lambda: self.arm.is_at(q))
-
-        self.gripper.move(0.5)

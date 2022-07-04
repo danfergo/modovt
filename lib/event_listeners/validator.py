@@ -1,4 +1,4 @@
-from lib.stats import Stats
+from experimenter.stats import Stats
 
 from experimenter import e
 
@@ -20,7 +20,7 @@ class Validator:
     def on_train_batch_end(self, ev):
         x, y_true = ev['batch']
         y_pred = ev['y_pred']
-        self.stats.update_running_stats('train', ev['loss'], [m(y_pred, y_true) for m in self.metrics])
+        self.stats.update_running_stats('train', ev['loss'], [m(y_pred, y_true).item() for m in self.metrics])
 
     def on_train_epoch_end(self, ev):
         self.stats.normalize_running_stats('train', ev['n_used_batches'])
@@ -34,7 +34,7 @@ class Validator:
             y_pred = self.model(x)
             loss = self.loss_fn(y_pred, y_true)
 
-            self.stats.update_running_stats('val', loss.item(), [m(y_pred, y_true) for m in self.metrics])
+            self.stats.update_running_stats('val', loss.item(), [m(y_pred, y_true).item() for m in self.metrics])
 
         self.stats.normalize_running_stats('val', self.n_val_batches)
 
