@@ -1,6 +1,3 @@
-import math
-
-import cv2
 import yarok
 from yarok import PlatformMJC, PlatformHW
 from yarok.components_manager import component
@@ -10,15 +7,8 @@ from yarok.components.ur5.ur5 import UR5
 
 from yarok.components.geltip.geltip import GelTip
 
-from src.wander_bh import normalize
-import numpy as np
-
-
-def color_map(size, color):
-    image = np.zeros((size[0], size[1], 3), np.uint8)
-    image[:] = color
-    return image
-
+from src.agent.rewards import TactilePainPleasureReward
+from src.utils.img import show
 
 """
     THIS WORLD AND BEHAVIOUR IS USED TO TEST DIFFERENT IMPLEMENTATIONS
@@ -89,49 +79,7 @@ class TestBehaviour:
     def __init__(self, finger: GelTip, bkg: GelTip):
         self.finger = finger
         self.bkg = bkg
-
-    def in_contact_area(self, rel_depth):
-        area = np.array(rel_depth)
-        area[area < 1e-05] = 0
-        area[area >= 1e-05] = 1
-        return area
-
-    def tactile_pixel_reward(self, rel_depth):
-        pain_min = 0.005
-        pain_range = 0.005
-        max_v = (pain_min / 2)
-        pain_coeff = 50
-        pleasure_coff = 5
-        return (-1 * pain_coeff * min(1.0, (rel_depth - pain_min) / pain_range)) \
-            if rel_depth > pain_min else (pleasure_coff * math.cos(((rel_depth - max_v) / max_v) * (math.pi / 2)))
-
-    def reward(self, rel_depth, return_maps=False):
-        in_contact_map = self.in_contact_area(rel_depth)
-        reward_map = np.vectorize(self.tactile_pixel_reward)(rel_depth)
-
-        area_size = np.sum(in_contact_map)
-        r = 0 if area_size == 0 else np.sum(reward_map) / area_size
-
-        if return_maps:
-            return r, in_contact_map, reward_map
-        return r
-
-    def tactile_color_map(self, tactile_reward_map):
-        pain_color = (0, 0, 255)
-        pleasure_color = (0, 255, 0)
-        map_shape = tactile_reward_map.shape
-
-        pain_map = np.array(tactile_reward_map)
-        pain_map[tactile_reward_map >= 0] = 0.0
-        pain_map *= -1
-        pain_map3 = np.stack([pain_map, pain_map, pain_map], axis=2)
-
-        pleasure_map = np.array(tactile_reward_map)
-        pleasure_map[tactile_reward_map < 0] = 0.0
-        pleasure_map3 = np.stack([pleasure_map, pleasure_map, pleasure_map], axis=2)
-
-        return np.multiply(pain_map3, color_map(map_shape, pain_color)) + \
-               np.multiply(pleasure_map3, color_map(map_shape, pleasure_color))
+        self.tactileReward = TactilePainPleasureReward()
 
     def wake_up(self):
         while True:
@@ -139,12 +87,12 @@ class TestBehaviour:
             depth = self.finger.read()
             rel_depth = bkg - depth
 
-            reward, in_contact_map, reward_map = self.reward(rel_depth, return_maps=True)
+            reward, in_contact_map, reward_map = self.tactileReward.reward(rel_depth, return_maps=True)
 
             print(reward)
-            cv2.imshow('tactile_reward_map', normalize(reward_map))
-            cv2.imshow('tactile_in_contact_area', normalize(in_contact_map))
-            cv2.imshow('color_map', normalize(self.tactile_color_map(reward_map)))
+            show('tactile_reward_map', reward_map)
+            show('tactile_in_contact_area', in_contact_map)
+            show('color_map', self.tactileReward.tactile_color_map(reward_map))
             yarok.wait(lambda: True)
 
 
@@ -154,6 +102,14 @@ if __name__ == '__main__':
         'behaviour': TestBehaviour,
         'defaults': {
             'environment': 'sim',
+            'components': {
+                '/finger': {
+                    'label_color': '1.0 1.0 0.0'
+                },
+                '/bkg': {
+                    'label_color': '1.0 1.0 0.0'
+                },
+            }
         },
         'environments': {
             'sim': {
@@ -166,5 +122,5 @@ if __name__ == '__main__':
             'real': {
                 'platform': PlatformHW
             }
-        },
+        }
     })

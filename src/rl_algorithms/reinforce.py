@@ -1,61 +1,70 @@
-import torch, numpy as np
+import torch
+from experimenter import e
+import numpy as np
 
-n_actions = 7
-lr = 0.01
+lr = 1.0
 discount_factor = 0.95
-T = 10
-
-nn = torch.nn.Sequential(
-    torch.nn.Linear(4, 64),
-    torch.nn.ReLU(),
-    torch.nn.Linear(64, n_actions),
-    torch.nn.Softmax(dim=1)
-)
-optim = torch.optim.Adam(nn.parameters(), lr=lr)
+T = 1000
 
 
-def eval_return(t, rewards):
-    return sum([(discount_factor ** k) * r for k, r in enumerate(rewards[t:])])
+class Reinforce:
 
+    def __init__(self, nn, optim=None):
+        self.nn = nn
+        self.optim = optim or torch.optim.Adam(nn.parameters(), lr=lr)
 
-def run(get_observation, eval_state, take_action):
-    while True:
-        # episode buffers
-        episode_actions = []
-        episode_observations = []
-        episode_rewards = []
+    def eval_return(self, t, rewards):
+        return sum([(discount_factor ** k) * r for k, r in enumerate(rewards[t:])])
 
-        # generate an episode
-        for t in range(T):
-            # get observation from the environment
-            o = get_observation()
-            o = torch.tensor(o, dtype=torch.float)
+    def run(self, get_observation, get_reward, take_action):
+        epoch = 1
+        while True:
+            # episode buffers
+            episode_actions = []
+            episode_observations = []
+            episode_rewards = []
 
-            # calculate the reward
-            r = eval_state(o)
+            print('exploring')
+            # generate an episode
+            for t in range(T):
+                # get observation from the environment
+                o = get_observation()
+                o = torch.tensor(o, dtype=torch.float)
+                o = torch.unsqueeze(o, 0)  # make a batch of one.
 
-            # sample action, given the observation, following the policy
-            pi_st = torch.distributions.Categorical(probs=nn(o))
-            a = pi_st.sample().item()
+                # sample action, given the observation, following the policy
+                pi_st = torch.distributions.Categorical(probs=self.nn(o))
+                a = pi_st.sample().item()
 
-            # st, at, rt, into the buffers
-            episode_actions.append(a)
-            episode_observations.append(o)
-            episode_rewards.append(r)
+                # take action and advance the environment
+                take_action(a)
 
-            # take action and advance the environment
-            take_action(a)
+                # calculate the reward
+                r = get_reward()
 
-        returns = [eval_return(t, episode_rewards) for t in range(len(episode_rewards))]
+                # st, at, rt, into the buffers
+                episode_actions.append(a)
+                episode_observations.append(o)
+                episode_rewards.append(r)
 
-        for st, at, gt in zip(episode_observations, episode_actions, returns):
-            pi_st = torch.distributions.Categorical(probs=nn(st))
-            log_prob = pi_st.log_prob(at)  # the log probability of this action being taken, i.e. log_πθ(st|at)
+            print('learning')
+            returns = [self.eval_return(t, episode_rewards) for t in range(len(episode_rewards))]
 
-            loss = - log_prob * gt  # log_πθ(st|at) * g
-            # the negative is used because we want to maximize the expected returns,
-            # while the optimizer minimizes
+            for st, at, gt in zip(episode_observations, episode_actions, returns):
+                at = torch.tensor(at, dtype=torch.int)
+                pi_st = torch.distributions.Categorical(probs=self.nn(st))
 
-            optim.zero_grad()  # zero the radient graph for every parameter x
-            loss.backward()  # compute the gradients dloss/dx
-            optim.step()  # performs the gradient update for every x i.e., x += -lr * x.grad
+                log_prob = pi_st.log_prob(at)  # the log probability of this action being taken, i.e. log_πθ(st|at)
+
+                loss = - log_prob * gt  # log_πθ(st|at) * g
+                # the negative is used because we want to maximize the expected returns,
+                # while the optimizer minimizes
+
+                self.optim.zero_grad()  # zero the radient graph for every parameter x
+                loss.backward()  # compute the gradients dloss/dx
+                self.optim.step()  # performs the gradient update for every x i.e., x += -lr * x.grad
+
+            e.emit('plot', {'name': 'reward', 'value': np.mean(np.array(returns))})
+            e.emit('il_patch', {'name': 'meta', 'data': {'epoch': epoch}})
+            e.emit('epoch_end', {'epoch': epoch})
+            epoch += 1

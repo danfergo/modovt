@@ -1,6 +1,6 @@
+import itertools
 import random
 
-import torch.nn
 import yarok
 from yarok import wait, PlatformMJC
 from math import pi
@@ -17,12 +17,9 @@ from experimenter import experiment
 from lib.event_listeners.exp_board.e_board import EBoard
 from lib.event_listeners.interactive_logger import InteractiveLogger
 from lib.event_listeners.interactive_plot import InteractivePlotter
-from lib.event_listeners.mjc_renderer import MJCRenderer
-from src.agent.nn import minimal_discrete_actor, minimal_dynamics_model
+from src.agent.nn import minimal_discrete_actor, minimal_dynamics_model, minimal_continuous_actor, minimal_q_fn
 from src.agent.rewards import TactilePainPleasureReward
-from src.rl_algorithms.curiosity_reinforce import CuriosityReinforce
-from src.rl_algorithms.ddpg import DDPG
-from src.rl_algorithms.reinforce import Reinforce
+from src.rl_algorithms.ddpg import DDPG, ReplayBuffer
 from src.utils.geometry import distance
 from src.utils.img import show
 from src.world.manipulator_world import ManipulatorWorld
@@ -46,20 +43,28 @@ class WanderBehaviour:
 
         self.tactileReward = TactilePainPleasureReward()
 
-        self.target_q = [pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, - pi / 2]
+        self.initial_q = [pi / 2,
+                          -pi / 2 - pi / 4,
+                          pi / 2 - pi / 4,
+                          0,
+                          pi / 2,
+                          - pi / 2]
         self.working_space = [
             [pi / 2 - pi / 4, pi / 2 + pi / 4],
-            [-pi / 2 - pi / 3, -pi / 2 - pi / 4],  # shoulder
+            [(-pi / 2 - pi / 4) - pi / 8, (-pi / 2 - pi / 4) + pi / 8],  # shoulder
             [pi / 2 - pi / 4 - pi / 4, pi / 2 - pi / 4 + pi / 4],
             [0 - pi / 4, 0 + pi / 4],
             [pi / 2 - pi / 4, pi / 2 + pi / 4],
             [- pi / 2 - pi / 4, - pi / 2 + pi / 4],
         ]
 
-        self.rl_learner = Reinforce(
-            # minimal_dynamics_model(7, 6),
-            minimal_discrete_actor(6, 6)
+        self.rl_learner = DDPG(
+            minimal_q_fn(6, 6),
+            minimal_continuous_actor(6, 6),
         )
+
+    def clip_workspace(self, q):
+        return [max(self.working_space[i][0], min(q[i], self.working_space[i][1])) for i in range(len(q))]
 
     def rnd_rel_qi(self, i):
         delta = 0.05
@@ -76,6 +81,12 @@ class WanderBehaviour:
         return [
             self.rnd_rel_qi(i)
             for i in range(len(self.target_q))
+        ]
+
+    def rnd_q(self):
+        return [
+            random.uniform(self.working_space[i][0], self.working_space[i][1])
+            for i in range(6)
         ]
 
     """
@@ -106,8 +117,8 @@ class WanderBehaviour:
 
     def wake_up(self):
         self.gripper.move(0)
-        self.arm.move_q(self.target_q)
-        wait(lambda: self.arm.is_at(self.target_q))  # and self.gripper.is_at(0))
+        # self.arm.move_q(self.initial_q)
+        # wait(lambda: self.arm.is_at(self.target_q))  # and self.gripper.is_at(0))
 
         # store background
         self.finger1_bkg = cv2.resize(self.fingerY.read(), (320, 240))
@@ -136,24 +147,45 @@ class WanderBehaviour:
             # r = rY + rB - 0.5
             # print('reward: ', r)
 
-            st = self.arm.at()
-            return 1 / distance([pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, - pi / 2], st)
+            p = [round(x, 3) for x in [pi / 2,
+                                       -pi / 2,
+                                       pi / 2 - pi / 4,
+                                       0,
+                                       pi / 2,
+                                       - pi / 2
+                                       ]]
+            st = [round(x, 3) for x in self.arm.at()]
+            d = distance(p, st)
+            r = 1000 if d == 0 else 1 / d
+            # print(r)
+            # print(st, distance([pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, - pi / 2], st))
+            return r
 
-        def take_action(ai):
-            # print('action: ', ai)
-            self.target_q = self.rnd_rel_discrete_q(ai)
-            # self.target_q[1] = -pi / 2 - pi / 3
+        # def clip(a):
+
+        def take_action(a):
+            self.target_q += np.array(a) * 0.1
+            self.target_q = self.clip_workspace(self.target_q)
             self.arm.move_q(self.target_q)
             wait(lambda: self.arm.is_at(self.target_q))
 
+        def reset():
+            self.target_q = self.rnd_q()
+            self.arm.move_q(self.target_q)
+            wait(lambda: self.arm.is_at(self.target_q))  # and self.gripper.is_at(0))
+
+        reset()
+
+        # clip,
         self.rl_learner.run(get_observation,
                             get_reward,
-                            take_action)
+                            take_action,
+                            reset)
 
 
 @experiment(
     """
-        Testing REINFORCE with simple reaching position goal
+        Testing DDPG with simple reaching position goal (Tuesday), lr 1.0, after fix r*=-1_over_r - 10000step , 1024 h
         r = (1 / distance( [pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, - pi / 2], st))
     """,
     {
@@ -192,12 +224,33 @@ class WanderBehaviour:
         InteractivePlotter(),
         InteractiveLogger(),
         # MJCRenderer(),
-        EBoard()
+        # EBoard(8081)
     ])
 def main():
+    experiments_datetimes = [
+        '2022-06-14 00:39:27',
+        '2022-06-14 00:39:28',
+        '2022-06-14 00:39:31',
+        '2022-06-14 00:39:32',
+        '2022-06-14 00:39:35',
+        '2022-06-14 00:39:38',
+        '2022-06-14 00:39:40',
+        '2022-06-14 00:40:03'
+    ]
+    files = [
+        e.ws('outputs',
+             e_datetime + ' - Testing DDPG with simple reaching position goal (data collection - day 2)',
+             'out',
+             str(i+1) + '_replay_buffer.npy')
+        for i, e_datetime in enumerate(experiments_datetimes)
+    ]
+    buffers = ReplayBuffer.load_all(files)
+    buff = list(itertools.chain(*[b.buffer for b in buffers]))
+    b = ReplayBuffer(buff).save(e.out('0_replay_buffer'))
+
     yarok.run(e.yarok)
 
 
 if __name__ == '__main__':
-    experimenter.run(main)
+    experimenter.run(main, append=True)
     # experimenter.query()

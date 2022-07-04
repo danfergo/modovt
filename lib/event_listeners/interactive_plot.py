@@ -4,33 +4,29 @@ import torch
 from experimenter import e
 
 
-class Plotter:
+class InteractivePlotter:
     """
         Class used to save the plots graphs during training
     """
 
-    def __init__(self, file_path='plot.png'):
-        self.file_path = file_path
-        self.metrics_names = e['metrics_names']
+    def __init__(self):
+        self.plots = {}
 
-    def on_validation_end(self, ev):
-        history = ev['history']
+    def on_plot(self, ev):
+        plot_name = ev['name']
+        value = ev['value']
+        if plot_name not in self.plots:
+            self.plots[plot_name] = []
+
+        self.plots[plot_name].append(value)
 
         plt.clf()
 
-        for i in range(1 + len(self.metrics_names)):
-            train_values = history['train']['all_losses'] if i == 0 else history['train']['all_metrics'][i - 1]
-            val_values = history['val']['all_losses'] if i == 0 else history['val']['all_metrics'][i - 1]
-            description = 'Loss ' if i == 0 else self.metrics_names[i - 1]
+        # plt.subplot(1 + len(self.metrics_names), 1, i + 1)
+        plt.plot(self.plots[plot_name])
+        plt.title('Min: {:.5f} Max: {:.5f}'.format(min(self.plots[plot_name]), max(self.plots[plot_name])))
 
-            if i > 0:
-                train_values = [x.cpu() if torch.is_tensor(x) else x for x in train_values]
-                val_values = [x.cpu() if torch.is_tensor(x) else x for x in val_values]
+        # plt.ylabel(description)
+        # plt.legend()
 
-            plt.subplot(1 + len(self.metrics_names), 1, i + 1)
-            plt.plot(train_values, label='Train ' + description)
-            plt.plot(val_values, label='Val ' + description)
-            plt.ylabel(description)
-            plt.legend()
-
-        plt.savefig(e.out(self.file_path), dpi=150)
+        plt.savefig(e.out('ip_' + plot_name + '.png'), dpi=150)

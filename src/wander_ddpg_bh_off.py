@@ -178,7 +178,7 @@ class WanderBehaviour:
 
 @experiment(
     """
-        Testing DDPG with simple reaching position goal (Sunday)
+        Testing DDPG with simple reaching position goal (data collection - day 2)
         r = (1 / distance( [pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, - pi / 2], st))
     """,
     {
@@ -214,15 +214,15 @@ class WanderBehaviour:
         }
     },
     lambda: [
-        InteractivePlotter(),
-        InteractiveLogger(),
+        # InteractivePlotter(),
+        # InteractiveLogger(),
         # MJCRenderer(),
-        EBoard()
+        # EBoard(port=8080)
     ])
 def main():
     yarok.run(e.yarok)
 
 
 if __name__ == '__main__':
-    experimenter.run(main)
+    experimenter.run(main, append=True)
     # experimenter.query()

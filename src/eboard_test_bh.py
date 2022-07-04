@@ -198,7 +198,10 @@ class WanderBehaviour:
         EBoard()
     ])
 def main(e):
-    yarok.run(e.yarok)
+    while True:
+        cv2.waitKey(1)
+    # wait()
+    # yarok.run(e.yarok)
 
 
 if __name__ == '__main__':

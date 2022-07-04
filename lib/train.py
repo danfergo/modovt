@@ -9,8 +9,8 @@ passing them the history.
 
 class SupervisedTrainer:
 
-    def __init__(self, kwargs):
-        self.model, self.optimizer, self.loss_fn = kwargs
+    def __init__(self, model, opt, loss):
+        self.model, self.optimizer, self.loss_fn = model, opt, loss
 
     def train_on_batch(self, batch, zero_grad=True, step=True):
 

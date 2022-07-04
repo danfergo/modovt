@@ -4,7 +4,9 @@ from threading import Thread
 import re
 
 from socketserver import ThreadingMixIn
-from http.server import HTTPServer, BaseHTTPRequestHandler, SimpleHTTPRequestHandler
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 
 from experimenter import e
 import json
@@ -35,64 +37,58 @@ def replace_all(x, config):
     return wrap['txt']
 
 
-def HandlerFactory(data_):
+def HandlerFactory(get_data):
     class CustomHandler(SimpleHTTPRequestHandler):
+        """
+            created per request.
+            wrapper HandlerFactory is used to pass the data object.
+        """
+
         def __init__(self, *args, **kwargs):
             self.routes = {
                 '/index.html': self.index,
                 '/api': self.api
             }
-            self.data = data_
-
-            super().__init__(*args, directory=e.out(), **kwargs)
-
-        # def __call__(self, *args, **kwargs):
-        #     """Handle a request."""
-        #     super().__init__(*args, directory=e.out(), **kwargs)
+            self.data = get_data()
+            super().__init__(*args, directory=e.ws() + 'outputs/', **kwargs)
 
         def html(self, path, data=None):
-            full_path = os.path.dirname(__file__) + '/html/' + path
+            full_path = os.path.dirname(__file__) + '/' + path
             f = open(full_path, 'r')
 
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.end_headers()
-            html = replace_all(f.read(), data)
-            self.wfile.write(bytes(html, "utf-8"))
+            self.wfile.write(bytes(f.read(), "utf-8"))
 
         def json(self, data=None):
-            data = data or None
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(bytes(json.dumps(data), 'utf-8'))
 
-        def api(self):
-            self.json(self.data)
-
-        def index(self):
-
-            card_template = """
-                <div class="card">
-                  <div class="card-body">
-                    <h5 class="card-title">{src}</h5>
-                    <img src="/{src}">
-                  </div>
-                </div>
-            """
-
-            plots = os.listdir(e.out())
+        def api(self, query):
+            exp_key = urlsafe_b64decode(query['k'][0]).decode() \
+                if 'k' in query else e.key()
             data = {
-                'main_content': "\n".join([card_template.format(src=p) for p in plots])
+                **self.data,
+                'key': exp_key,
+                'files': [exp_key + '/out/' + f for f in os.listdir(e.ws() + 'outputs/' + exp_key + '/out/')],
+                'experiments': [urlsafe_b64encode(bytes(f, 'utf-8')).decode() for f in os.listdir(e.ws() + 'outputs/')]
             }
-            self.html('/index.html', data)
+            self.json(data)
+
+        def index(self, query):
+            self.html('/index.html')
 
         def do_GET(self):
-            path = self.path
+            parsed_url = urlparse(self.path)
+            query = parse_qs(parsed_url.query)
+            path = parsed_url.path
             path = '/index.html' if path == '/' else path
 
             if path in self.routes:
-                self.routes[path]()
+                self.routes[path](query)
             else:
                 super().do_GET()
 
@@ -108,29 +104,32 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 class EBoard:
 
-    def __init__(self):
+    def __init__(self, port=8080):
         hostName = "0.0.0.0"
-        serverPort = 8080
+        serverPort = port
         self.server = None
-        self.data = {}
+        self.data = {
+            'tick': 0
+        }
         self.thread = Thread(target=self.serve_on_port, args=[
             hostName,
-            serverPort,
-            self.data
+            serverPort
         ])
         self.thread.start()
 
-    def serve_on_port(self, hostname, port, data):
-        handler = HandlerFactory(data)
+    def serve_on_port(self, hostname, port):
+        handler = HandlerFactory(self._get_data)
         self.server = ThreadingHTTPServer((hostname, port), handler)
         print("Server started http://%s:%s" % (hostname, port))
         self.server.serve_forever()
 
-    def on_epoch_end(self, ev):
-        def assign(k, v):
-            self.data[k] = v
+    def _get_data(self):
+        return self.data
 
-        assign('epoch', ev['epoch'])
+    def on__all(self, ev):
+        self.data = {
+            'tick': self.data['tick'] + 1
+        }
 
     def on_e_end(self, ev):
         self.server.server_close()

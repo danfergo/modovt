@@ -38,40 +38,41 @@ from yarok.components.geltip.geltip import GelTip
                 <light directional="true" diffuse=".4 .4 .4" specular="0.1 0.1 0.1" pos="0 0 5.0" dir="0 0 -1"/>
                 <light directional="true" diffuse=".6 .6 .6" specular="0.2 0.2 0.2" pos="0 0 4" dir="0 0 -1"/>
                 <camera name="viewer" pos="-0. -2 0.3" mode="fixed" zaxis="0 -1 0"/>
-
+<!--
                 <body name="floor">
                     <geom name="ground" type="plane" size="0 0 1" pos="0 0 0" quat="1 0 0 0" material="matplane" condim="1"/>
-                </body>
-  <!--              xyaxes="0 1 0 1 0 0" -->
-                <body pos="0.5 -0.1 -0.63" > 
+                </body> -->
+
+               <!--  <body name="rope" pos="0.5 -0.1 -0.63" > 
                     <composite type="grid" count="40 1 1" spacing="0.01" offset="0 0 1">
-                        <!-- <skin material="matplane" inflate="0.001" subgrid="3" texcoord="true"/> -->
                         <joint kind="main" damping="0.01"/>
                         <tendon kind="main" width="0.01" rgba=".8 .2 .1 1"/>
                         <geom size=".01" rgba=".8 .2 .1 1"/>
-                        <!-- <pin coord="1"/> -->
                         <pin coord="39"/> 
                     </composite>
-                </body>
-                
-                <body>
-                    <geom type="box" size="0.01 0.1 0.12" pos="0.4 -0.05 0.12"/>
-                </body>
+                </body> -->
+                <!--
+                <body name='plate'>
+                    <geom type="box" size="0.1 0.1 0.05" pos="0.75 -0.05 0"                           contype="1" 
+                          conaffinity="1"/>
+                </body> -->
 
-                <ur5 name="arm">
-                   <robotiq_2f85 name="gripper" parent="ee_link">
-                        <body pos="0 0.02 0.0395" parent="right_tip">
-                            <geltip name="geltip1" parent="left_tip"/>
-                        </body>
-                        <body pos="0 0.02 0.0395" parent="left_tip">
-                            <geltip name="geltip2" parent="right_tip"/>
-                           <!-- <body>
-                                <geom pos=".009 -.009 .045" size=".0035" rgba="0 1 0 1"/>
-                                <geom pos="-.009 .009 .03" size=".0035" rgba="0 1 0 1"/>
-                            </body> -->
-                        </body>
-                    </robotiq_2f85>
-                </ur5> 
+                <body  pos="0 0 0.1" >
+                  <ur5 name="arm">
+                       <robotiq_2f85 name="gripper" parent="ee_link">
+                            <body pos="0 0.02 0.0395" parent="right_tip">
+                                <geltip name="finger_yellow" parent="left_tip"/>
+                            </body>
+                            <body pos="0 0.02 0.0395" parent="left_tip">
+                                <geltip name="finger_blue" parent="right_tip"/>
+                               <!-- <body>
+                                    <geom pos=".009 -.009 .045" size=".0035" rgba="0 1 0 1"/>
+                                    <geom pos="-.009 .009 .03" size=".0035" rgba="0 1 0 1"/>
+                                </body> -->
+                            </body>
+                        </robotiq_2f85>
+                    </ur5> 
+                </body>
             </worldbody>        
         </mujoco>
     """
