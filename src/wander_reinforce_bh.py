@@ -103,7 +103,6 @@ class WanderBehaviour:
     def wake_up(self):
         self.gripper.move(0)
 
-
         # store background
         # self.finger1_bkg = cv2.resize(self.fingerY.read(), (320, 240))
         # self.finger2_bkg = cv2.resize(self.fingerB.read(), (320, 240))
@@ -131,6 +130,9 @@ class WanderBehaviour:
             # r = rY + rB - 0.5
             # print('reward: ', r)
 
+            # @experiment({            }, distance)
+
+
             st = self.arm.at()
             return 1 / distance([pi / 2, -pi / 2, pi / 2 - pi / 4, 0, pi / 2, - pi / 2], st)
 
@@ -141,12 +143,10 @@ class WanderBehaviour:
             self.arm.move_q(self.target_q)
             wait(lambda: self.arm.is_at(self.target_q))
 
-
         def reset():
             self.target_q = self.initial_q
             self.arm.move_q(self.target_q)
             wait(lambda: self.arm.is_at(self.target_q))  # and self.gripper.is_at(0))
-
 
         reset()
 
