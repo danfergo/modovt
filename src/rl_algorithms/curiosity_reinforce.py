@@ -3,7 +3,6 @@ import torch
 
 from experimenter import EConfigBlock, e
 from lib.train import SupervisedTrainer
-from base64 import decode
 
 n_actions = 6
 lr = 0.01

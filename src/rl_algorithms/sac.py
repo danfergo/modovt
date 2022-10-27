@@ -89,8 +89,8 @@ class DDPG:
 
             # pi_st = torch.distributions.Categorical(probs=self.nn(st))
 
-            v_target = self.v_fn(ot)*(self.v_fn(ot) - q_sa_t + self.policy.log_prob(ot, at))
-            q_targets = [self.q_fn.prob(at,st))]
+            v_target = self.v_fn(ot) * (self.v_fn(ot) - q_sa_t + self.policy.log_prob(ot, at))
+            q_targets = [self.q_fn.prob(at, st)]
 
             # update q function
             # loss = torch.tensor(
