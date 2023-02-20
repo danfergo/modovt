@@ -1,5 +1,16 @@
 ./run_mj examples.vitac_world.launch
 
+
+
+# Training schema
+
+1. Train auto encoders
+2. Train passive dynamics model a = 0
+3. Train active dynamics model  a != 0 
+4. Find policy.
+5. 
+
+
 1. Explore the world randomly.
 
 2. Learn about positive and negative rewards from tactile sensing
